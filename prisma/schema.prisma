@@ -1,0 +1,46 @@
+// 智能供应链多维表格系统 - 数据库Schema
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// 核心表结构 - Table (表定义)
+model Table {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  fields      Field[]
+  records     Record[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Field (字段定义)
+model Field {
+  id       String @id @default(cuid())
+  tableId  String
+  table    Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  name     String
+  type     String // text, number, select, multiSelect, link, formula
+  config   String @default("{}") // JSON字符串: {options: [], linkedTableId: "", formula: ""}
+  order    Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tableId])
+}
+
+// Record (记录数据)
+model Record {
+  id        String   @id @default(cuid())
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  data      String   @default("{}") // JSON字符串: {fieldId: value}
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tableId])
+}
