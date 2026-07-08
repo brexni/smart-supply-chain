@@ -1,10 +1,10 @@
-// 智能供应链多维表格系统 - 数据库Schema
+// 智能供应链多维表格系统 - 数据库Schema (Supabase PostgreSQL)
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 // 核心表结构 - Table (表定义)
@@ -14,33 +14,37 @@ model Table {
   description String?
   fields      Field[]
   records     Record[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("Table")
 }
 
 // Field (字段定义)
 model Field {
-  id       String @id @default(cuid())
-  tableId  String
-  table    Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
-  name     String
-  type     String // text, number, select, multiSelect, link, formula
-  config   String @default("{}") // JSON字符串: {options: [], linkedTableId: "", formula: ""}
-  order    Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  id        String   @id @default(cuid())
+  tableId   String   @map("table_id")
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  name      String
+  type      String
+  config    String   @default("{}")
+  order     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@index([tableId])
+  @@map("Field")
 }
 
 // Record (记录数据)
 model Record {
   id        String   @id @default(cuid())
-  tableId   String
+  tableId   String   @map("table_id")
   table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
-  data      String   @default("{}") // JSON字符串: {fieldId: value}
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  data      String   @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
   @@index([tableId])
+  @@map("Record")
 }

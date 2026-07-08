@@ -293,7 +293,7 @@ export async function searchRecords(tableId: string, searchTerm: string) {
     const records = await prisma.record.findMany({
       where: {
         tableId,
-        // SQLite的LIKE搜索
+        // 文本搜索 (PostgreSQL ILIKE)
         data: {
           contains: searchTerm
         }
