@@ -1,105 +1,64 @@
+'use client'
+
 import Link from 'next/link'
-import { prisma } from '@/lib/prisma'
-import { evaluateFormulasForRecords } from '@/lib/formula-engine'
+import { useEffect, useState } from 'react'
 import StatsCards from './StatsCards'
 import SupplierRiskChart from './SupplierRiskChart'
 import OrderStatusChart from './OrderStatusChart'
 import InventoryAlerts from './InventoryAlerts'
 
-// 设置为动态渲染
-export const dynamic = 'force-dynamic'
+type DashboardData = {
+  stats: {
+    totalAmount: number
+    supplierCount: number
+    productCount: number
+    orderCount: number
+    lowStockCount: number
+  }
+  charts: {
+    ordersByStatus: Record<string, number>
+    ordersByRisk: Record<string, number>
+  }
+  orderTableId?: string
+}
 
-export default async function DashboardPage() {
-  // 获取所有表
-  const tables = await prisma.table.findMany({
-    include: {
-      fields: { orderBy: { order: 'asc' } },
-      records: true
-    }
-  })
+export default function DashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  // 查找业务表
-  const supplierTable = tables.find((t) => t.name === '供应商表')
-  const productTable = tables.find((t) => t.name === '商品表')
-  const orderTable = tables.find((t) => t.name === '采购订单表')
+  useEffect(() => {
+    fetch('/api/dashboard')
+      .then((res) => res.json())
+      .then((data) => {
+        setData(data)
+        setLoading(false)
+      })
+      .catch((error) => {
+        console.error('加载仪表盘数据失败:', error)
+        setLoading(false)
+      })
+  }, [])
 
-  // 处理采购订单数据
-  let totalAmount = 0
-  let ordersByStatus: Record<string, number> = {}
-  let ordersByRisk: Record<string, number> = { 低风险: 0, 中风险: 0, 高风险: 0 }
-
-  if (orderTable) {
-    const fields = orderTable.fields.map((f) => ({
-      ...f,
-      config: JSON.parse(f.config)
-    }))
-
-    const records = orderTable.records.map((r) => ({
-      ...r,
-      data: JSON.parse(r.data)
-    }))
-
-    // 计算公式字段
-    const recordsWithFormulas = evaluateFormulasForRecords(records, fields)
-
-    const amountField = fields.find((f) => f.name.includes('总金额'))
-    const statusField = fields.find((f) => f.name.includes('状态'))
-
-    for (const record of recordsWithFormulas) {
-      // 统计总金额
-      if (amountField && record.data[amountField.id]) {
-        totalAmount += Number(record.data[amountField.id]) || 0
-      }
-
-      // 统计订单状态
-      if (statusField) {
-        const status = record.data[statusField.id] || '未知'
-        ordersByStatus[status] = (ordersByStatus[status] || 0) + 1
-      }
-    }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⏳</div>
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    )
   }
 
-  // 处理供应商风险分布
-  if (supplierTable) {
-    const fields = supplierTable.fields.map((f) => ({
-      ...f,
-      config: JSON.parse(f.config)
-    }))
-
-    const riskField = fields.find((f) => f.name.includes('风险'))
-
-    if (riskField) {
-      for (const record of supplierTable.records) {
-        const data = JSON.parse(record.data)
-        const risk = data[riskField.id] || '未知'
-        if (ordersByRisk.hasOwnProperty(risk)) {
-          ordersByRisk[risk]++
-        }
-      }
-    }
-  }
-
-  // 检查库存预警
-  let lowStockCount = 0
-  if (productTable) {
-    const fields = productTable.fields.map((f) => ({
-      ...f,
-      config: JSON.parse(f.config)
-    }))
-
-    const safetyStockField = fields.find((f) => f.name.includes('安全库存'))
-    const currentStockField = fields.find((f) => f.name.includes('当前库存'))
-
-    if (safetyStockField && currentStockField) {
-      for (const record of productTable.records) {
-        const data = JSON.parse(record.data)
-        const current = data[currentStockField.id] || 0
-        const safety = data[safetyStockField.id] || 0
-        if (current < safety) {
-          lowStockCount++
-        }
-      }
-    }
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">❌</div>
+          <p className="text-gray-600">加载数据失败</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -123,17 +82,17 @@ export default async function DashboardPage() {
 
         {/* 统计卡片 */}
         <StatsCards
-          totalAmount={totalAmount}
-          supplierCount={supplierTable?.records.length || 0}
-          productCount={productTable?.records.length || 0}
-          orderCount={orderTable?.records.length || 0}
-          lowStockCount={lowStockCount}
+          totalAmount={data.stats.totalAmount}
+          supplierCount={data.stats.supplierCount}
+          productCount={data.stats.productCount}
+          orderCount={data.stats.orderCount}
+          lowStockCount={data.stats.lowStockCount}
         />
 
         {/* 图表区域 */}
         <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <SupplierRiskChart data={ordersByRisk} />
-          <OrderStatusChart data={ordersByStatus} />
+          <SupplierRiskChart data={data.charts.ordersByRisk} />
+          <OrderStatusChart data={data.charts.ordersByStatus} />
         </div>
 
         {/* 库存预警 */}
@@ -161,9 +120,9 @@ export default async function DashboardPage() {
               <p className="text-sm text-gray-600">初始化或重置供应链示例数据</p>
             </Link>
 
-            {orderTable && (
+            {data.orderTableId && (
               <Link
-                href={`/tables/${orderTable.id}`}
+                href={`/tables/${data.orderTableId}`}
                 className="p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition"
               >
                 <div className="text-2xl mb-2">📋</div>

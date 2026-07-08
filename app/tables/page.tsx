@@ -1,13 +1,44 @@
+'use client'
+
 import Link from 'next/link'
-import { getTables } from '@/app/actions/table-actions'
+import { useEffect, useState } from 'react'
 import CreateTableButton from './CreateTableButton'
 
-// 设置为动态渲染
-export const dynamic = 'force-dynamic'
+type TableData = {
+  id: string
+  name: string
+  description?: string | null
+  fields: any[]
+  _count: { records: number }
+}
 
-export default async function TablesPage() {
-  const result = await getTables()
-  const tables = result.success && result.data ? result.data : []
+export default function TablesPage() {
+  const [tables, setTables] = useState<TableData[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/tables')
+      .then((res) => res.json())
+      .then((data) => {
+        setTables(data)
+        setLoading(false)
+      })
+      .catch((error) => {
+        console.error('加载表格失败:', error)
+        setLoading(false)
+      })
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⏳</div>
+          <p className="text-gray-600">加载中...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
